@@ -184,3 +184,70 @@ async function sendMessagesInBatch() {
         console.error("Error sending batch of messages to RabbitMQ:", error);
     }
 }
+
+async function consumeMessages(queueName) {
+  try {
+    // Connect to RabbitMQ server
+    const opt = { credentials: amqplib.credentials.plain(USERNAME, PASSWORD) };
+    const connection = await amqplib.connect(RMQ_URL, opt);
+
+    // Create a channel
+    const channel = await connection.createChannel();
+
+    // Assert the queue exists
+    await channel.assertQueue(queueName, { durable: true });
+
+    // Define DLX and its arguments
+    const dlxName = `${queueName}.dlx`;
+    const dlxArguments = {
+      'x-message-ttl': 30000, // TTL for messages in DLX (in milliseconds)
+      'x-dead-letter-exchange': '',
+      'x-dead-letter-routing-key': queueName // Requeue to original queue
+    };
+
+    // Assert the DLX
+    await channel.assertExchange(dlxName, 'direct', { durable: true, arguments: dlxArguments });
+
+    // Bind the DLX to the original queue
+    await channel.bindQueue(queueName, dlxName, `${queueName}_dlx_routing_key`);
+
+    // Consume messages from the queue
+    await channel.consume(queueName, async (message) => {
+      if (message !== null) {
+        try {
+          // Process the message
+          await processMessage(message);
+
+          // Acknowledge the message
+          channel.ack(message);
+        } catch (error) {
+          console.error("Error processing message:", error);
+
+          // Reject and requeue the message to DLX
+          channel.nack(message, false, false);
+        }
+      }
+    });
+    
+    console.log("Consumer started");
+
+  } catch (error) {
+    console.error("Error consuming messages from RabbitMQ:", error);
+  }
+}
+
+async function processMessage(message) {
+  // Simulate message processing
+  await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate processing time (1 second)
+  
+  // Simulate an error occurring randomly during processing
+  if (Math.random() < 0.2) { // 20% chance of encountering an error
+    throw new Error("Error during message processing");
+  }
+
+  console.log("Message processed:", message.content.toString());
+}
+
+// Example usage
+// const queueName = "example_queue";
+consumeMessages(queueName);
