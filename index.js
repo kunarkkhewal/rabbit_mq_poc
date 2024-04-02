@@ -1,12 +1,12 @@
 const express = require('express');
 const amqplib = require("amqplib");
 const uuid = require('uuid');
+const dotenv = require('dotenv');
+dotenv.config();
 
 const app = express();
 
 const PORT = process.env.PORT || 5000;
-
-const RMQ_URL = 'amqp://localhost', USERNAME = 'guest', PASSWORD = 'guest'
 
 const queueName = 'scheduler-queue-test'
 
@@ -48,8 +48,8 @@ async function sendMessageToRabbitMQ() {
     const queueName = 'scheduler-queue-test';
     const message = 'testing ' + new Date();
     console.log(message);
-    const opt = { credentials: amqplib.credentials.plain(USERNAME, PASSWORD) };
-    const connection = await amqplib.connect(RMQ_URL, opt);
+    const opt = { credentials: amqplib.credentials.plain(process.env.USERNAME, process.env.PASSWORD) };
+    const connection = await amqplib.connect(process.env.RMQ_URL, opt);
     const channel = await connection.createChannel();
     
     await channel.assertQueue(queueName, { durable: true });
@@ -87,9 +87,12 @@ async function sendMessageToRabbitMQ() {
     //     { 
     //         persistent: true,
     //         headers: {
-    //             "x-delay": 20000,
+    //             "x-delay": 3600,
     //             'x-message-id': messageId
-    //         } 
+    //         },
+    //         // expiration: 7200,
+    //         messageId,
+    //         // timestamp: 12345
     //     }
     // )
 
@@ -100,8 +103,8 @@ async function sendMessageToRabbitMQ() {
 
 async function getMessageFromRabbitMQ() {
     const queueName = 'scheduler-queue-test';
-    const opt = { credentials: amqplib.credentials.plain(USERNAME, PASSWORD) };
-    const connection = await amqplib.connect(RMQ_URL, opt);
+    const opt = { credentials: amqplib.credentials.plain(process.env.USERNAME, process.env.PASSWORD) };
+    const connection = await amqplib.connect(process.env.RMQ_URL, opt);
     
     const channel = await connection.createChannel();
     await channel.assertQueue(queueName, { durable: true });
@@ -120,7 +123,7 @@ async function getMessageFromRabbitMQ() {
 async function cancelScheduledMessages(messageId) {
     try {
         // const queueName = 'scheduler-queue-test';
-        const connection = await amqplib.connect(RMQ_URL);
+        const connection = await amqplib.connect(process.env.RMQ_URL);
         const channel = await connection.createChannel();
         // Re-publish the message with a TTL of 0 to cancel it
         await channel.publish('delay-exchange', 'delay_routing_key', Buffer.from(''), {
@@ -145,8 +148,8 @@ async function sendMessagesInBatch() {
     ]];
     try {
       // Connect to RabbitMQ server
-        const opt = { credentials: amqplib.credentials.plain(USERNAME, PASSWORD) };
-        const connection = await amqplib.connect(RMQ_URL, opt);
+        const opt = { credentials: amqplib.credentials.plain(process.env.USERNAME, process.env.PASSWORD) };
+        const connection = await amqplib.connect(process.env.RMQ_URL, opt);
         // const connection = await amqplib.connect(process.env.RABBIT_MQ_HOST);
     
         // Create a channel
@@ -188,8 +191,8 @@ async function sendMessagesInBatch() {
 async function consumeMessages(queueName) {
   try {
     // Connect to RabbitMQ server
-    const opt = { credentials: amqplib.credentials.plain(USERNAME, PASSWORD) };
-    const connection = await amqplib.connect(RMQ_URL, opt);
+    const opt = { credentials: amqplib.credentials.plain(process.env.USERNAME, process.env.PASSWORD) };
+    const connection = await amqplib.connect(process.env.RMQ_URL, opt);
 
     // Create a channel
     const channel = await connection.createChannel();
@@ -250,4 +253,4 @@ async function processMessage(message) {
 
 // Example usage
 // const queueName = "example_queue";
-consumeMessages(queueName);
+// consumeMessages(queueName);
