@@ -1,6 +1,7 @@
 const express = require('express');
 const amqplib = require("amqplib");
 const uuid = require('uuid');
+const axios = require('axios');
 const dotenv = require('dotenv');
 dotenv.config();
 
@@ -254,3 +255,31 @@ async function processMessage(message) {
 // Example usage
 // const queueName = "example_queue";
 // consumeMessages(queueName);
+
+async function getQueueRuntimeProperties() {
+    try {
+        const username = process.env.USERNAME;
+        const password = process.env.PASSWORD;
+        const authHeader = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
+    
+        const response = await axios.get(`http://localhost:15672/api/queues/%2F/${queueName+''}`, {
+            headers: {
+                'Authorization': authHeader
+            }
+        });
+        console.log('data => ', response.data);
+    } catch (error) {
+        console.log('error => ', error)
+        if (error.response && error.response.status === 404) {
+            console.log(`The queue '${queueName}' does not exist.`);
+            return null;
+        } else {
+            throw error;
+        }
+    }
+}
+
+setTimeout(() => {
+    console.log("CALLING getQueueRuntimeProperties")
+    getQueueRuntimeProperties();
+}, 1000)
