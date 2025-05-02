@@ -111,9 +111,9 @@ const sendMessageToRabbitMQ = async () => {
     let connection;
     let channel;
     try {
-        console.log(`process.env.RABBIT_MQ_HOST : ${process.env.RABBIT_MQ_HOST}`);
+        console.log(`process.env.RMQ_MQ_HOST : ${process.env.RMQ_MQ_HOST}`);
         console.log(`opt : ${JSON.stringify(opt)}`);
-        connection = await amqplib.connect(process.env.RABBIT_MQ_HOST, opt);
+        connection = await amqplib.connect(process.env.RMQ_MQ_HOST, opt);
         channel = await connection.createChannel();
     } catch (error) {
         console.log("sendMessageToRabbitMQ :: Error in creating channel: ", error);
@@ -144,7 +144,7 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // const getMessageFromRabbitMQ = async () => {
 //     let connection, channel;
 //     try {
-//         connection = await amqplib.connect(process.env.RABBIT_MQ_HOST, opt);
+//         connection = await amqplib.connect(process.env.RMQ_MQ_HOST, opt);
 //         channel = await connection.createChannel();
 //         await channel.assertQueue(queueName, { durable: true }); // arguments: { "x-queue-type": "quorum", "x-delivery-limit": 10}
 //         console.log(new Date(), ' - ', 'Started Waiting for messages in queue: ', queueName);
@@ -192,7 +192,7 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const getMessageFromRabbitMQ = async () => {
     try {
     console.log(`calling getMessageFromRabbitMQ for queue: ${queueName}`);
-      const connection = await amqplib.connect(process.env.RABBIT_MQ_HOST, opt);
+      const connection = await amqplib.connect(process.env.RMQ_MQ_HOST, opt);
       const channel = await connection.createChannel();
       await channel.assertQueue(queueName, { durable: true });
       channel.consume(
