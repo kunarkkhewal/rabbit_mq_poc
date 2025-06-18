@@ -5,6 +5,7 @@ const axios = require('axios');
 const dotenv = require('dotenv');
 dotenv.config();
 const { performance } = require('perf_hooks');
+const { rmqEventsAndRetry } = require('./rmqUtils');
 
 const app = express();
 
@@ -22,12 +23,16 @@ let result = [];
 app.post('/send', async (req, res) => {
     console.log('HIT SEND ROUTE')
     await sendMessageToRabbitMQ();
-    res.send(200)
+    res.sendStatus(200)
 })
 
 app.get('/get', async (req, res) => {
     console.log('HIT GET ROUTE')
-    await getMessageFromRabbitMQ();
+    try {
+        await getMessageFromRabbitMQ();
+    } catch (error) {
+        console.log('error in ROUTEgetMessageFromRabbitMQ', error);
+    }
 })
 
 app.listen(PORT, () => {
@@ -121,7 +126,7 @@ const sendMessageToRabbitMQ = async () => {
     
 
     try {
-        await channel.assertQueue(queueName, { durable: true });
+        await channel.assertQueue(queueName, { durable: true, arguments: { "x-consumer-timeout": 60000 }}); // ,arguments: { "x-consumer-timeout": 60000, "x-queue-type": "quorum", "x-delivery-limit": 10}
         const optional = { persistent: true };
         await channel.sendToQueue(
             queueName,
@@ -189,12 +194,28 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 //     }
 // }
 
-const getMessageFromRabbitMQ = async () => {
+const getMessageFromRabbitMQ = async (count = 0) => {
+  let connection;
+  let channel;
+  // let count = 0;
+  
     try {
-    console.log(`calling getMessageFromRabbitMQ for queue: ${queueName}`);
-      const connection = await amqplib.connect(process.env.RMQ_MQ_HOST, opt);
-      const channel = await connection.createChannel();
-      await channel.assertQueue(queueName, { durable: true });
+      console.log(`calling getMessageFromRabbitMQ for queue: ${queueName}`);
+      if(!connection) {
+        connection = await amqplib.connect(process.env.RMQ_MQ_HOST, opt);
+      }
+      if (!channel) {
+        channel = await connection.createChannel();
+      }
+
+      rmqEventsAndRetry(connection, channel, getMessageFromRabbitMQ, count);
+
+      if (count === 2) {
+        await channel.assertQueue(queueName, { durable: true, arguments: { "x-consumer-timeout": 60000 }}); // ,arguments: { "x-consumer-timeout": 60000, "x-queue-type": "quorum", "x-delivery-limit": 10} // 60000 is the timeout for the consumer
+      } else {
+        await channel.assertQueue(queueName, { durable: true, arguments: { "x-queue-type": "quorum", }}); // ,arguments: { "x-consumer-timeout": 60000, "x-queue-type": "quorum", "x-delivery-limit": 10} // 60000 is the timeout for the consumer
+      }
+
       channel.consume(
         queueName,
         async (message) => {
