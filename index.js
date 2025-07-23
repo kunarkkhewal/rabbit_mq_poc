@@ -210,11 +210,11 @@ const getMessageFromRabbitMQ = async (count = 0) => {
 
       rmqEventsAndRetry(connection, channel, getMessageFromRabbitMQ, count);
 
-      if (count === 2) {
-        await channel.assertQueue(queueName, { durable: true, arguments: { "x-consumer-timeout": 60000 }}); // ,arguments: { "x-consumer-timeout": 60000, "x-queue-type": "quorum", "x-delivery-limit": 10} // 60000 is the timeout for the consumer
-      } else {
-        await channel.assertQueue(queueName, { durable: true, arguments: { "x-queue-type": "quorum", }}); // ,arguments: { "x-consumer-timeout": 60000, "x-queue-type": "quorum", "x-delivery-limit": 10} // 60000 is the timeout for the consumer
-      }
+      // if (count === 2) {
+      await channel.assertQueue(queueName, { durable: true, arguments: { "x-consumer-timeout": 60000 }}); // ,arguments: { "x-consumer-timeout": 60000, "x-queue-type": "quorum", "x-delivery-limit": 10} // 60000 is the timeout for the consumer
+      // } else {
+        // await channel.assertQueue(queueName, { durable: true, arguments: { "x-queue-type": "quorum", }}); // ,arguments: { "x-consumer-timeout": 60000, "x-queue-type": "quorum", "x-delivery-limit": 10} // 60000 is the timeout for the consumer
+      // }
 
       channel.consume(
         queueName,
@@ -223,6 +223,7 @@ const getMessageFromRabbitMQ = async (count = 0) => {
             if (message !== null) {
               const brokeredMessage = JSON.parse(message.content.toString());
               console.log({brokeredMessage})
+              await delay(1800010);
               await channel.ack(message);
               console.log('deleted message from getMessageFromRabbitMQ');
             } else {
