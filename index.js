@@ -5,13 +5,13 @@ const axios = require('axios');
 const dotenv = require('dotenv');
 dotenv.config();
 const { performance } = require('perf_hooks');
-const { rmqEventsAndRetry } = require('./rmqUtils');
+const { rmqEventsAndRetry, handleMessageRetry } = require('./rmqUtils');
 
 const app = express();
 
 const PORT = process.env.PORT || 5005;
 
-const queueName = 'scheduler-queue-kunark-poc'; 
+const queueName = 'kunark-poc'; 
 // console.log('process.env.RMQ_USERNAME, process.env.RMQ_PASSWORD => ', process.env.RMQ_USERNAME, process.env.RMQ_PASSWORD)
 const opt = { credentials: amqplib.credentials.plain(process.env.RMQ_USERNAME, process.env.RMQ_PASSWORD) };
 const totalMessageCount = 10;
@@ -223,9 +223,10 @@ const getMessageFromRabbitMQ = async (count = 0) => {
             if (message !== null) {
               const brokeredMessage = JSON.parse(message.content.toString());
               console.log({brokeredMessage})
-              await delay(1800010);
-              await channel.ack(message);
-              console.log('deleted message from getMessageFromRabbitMQ');
+              // await delay(1800010);
+              // await channel.ack(message);
+              // console.log('deleted message from getMessageFromRabbitMQ');
+              throw new Error('test error');
             } else {
               console.log('RabbitMQ Consumer cancelled by server');
             }
@@ -234,7 +235,27 @@ const getMessageFromRabbitMQ = async (count = 0) => {
               'error consuming RMQ message from getMessageFromRabbitMQ',
               error
             );
-            await channel.nack(message);
+            // await channel.nack(message);
+            await handleMessageRetry({
+              channel,
+              message,
+              queueName,
+              error,
+              maxDeliveryAttempts: 3,
+              shouldSendToDeadLetterQueue: true,
+              shouldDeleteMessage: false,
+            })
+            // todo: add new function here to handle negative acknowledgement cases, 
+            // either to requeue or to delete the message from the queue or send it to dead letter queue after certain number of retries, also to handle the number of retries for the message
+
+            // // Just nack the message and requeue it (default behavior)
+            // await channel.nack(message);
+
+            // // Nack the message but don't requeue it
+            // await channel.nack(message, false, false);
+
+            // // Nack all messages up to this one and requeue them
+            // await channel.nack(message, true, true);
           }
         },
         { noAck: false }
@@ -244,3 +265,59 @@ const getMessageFromRabbitMQ = async (count = 0) => {
       console.log(`error in getMessageFromRabbitMQ:: ${error}`);
     }
   };
+
+
+
+
+
+  const getMessageFromRabbitMQWithExchange = async (count = 0) => {
+    let connection;
+    let channel;
+    // let count = 0;
+    const queueName = 'broadcast-queue-mehmood';   
+
+      try {
+        console.log(`calling getMessageFromRabbitMQ for queue: ${queueName}`);
+        if(!connection) {
+          connection = await amqplib.connect(process.env.RMQ_MQ_HOST, opt);
+        }
+        if (!channel) {
+          channel = await connection.createChannel();
+        }
+  
+        // if (count === 2) {
+        // await channel.assertQueue(queueName, { durable: true, arguments: { "x-consumer-timeout": 60000 }}); // ,arguments: { "x-consumer-timeout": 60000, "x-queue-type": "quorum", "x-delivery-limit": 10} // 60000 is the timeout for the consumer
+        // } else {
+          // await channel.assertQueue(queueName, { durable: true, arguments: { "x-queue-type": "quorum", }}); // ,arguments: { "x-consumer-timeout": 60000, "x-queue-type": "quorum", "x-delivery-limit": 10} // 60000 is the timeout for the consumer
+        // }
+        const queueInfo = await getRMQManagementAPI(queueName);
+        const consumerTag = queueInfo.consumer_details[0].consumer_tag; 
+        console.log('consumerTag => ', consumerTag);
+        channel.cancel(consumerTag);
+        console.log(`registered consumer for RMQ -> ${queueName}`);
+      } catch (error) {
+        console.log(`error in getMessageFromRabbitMQ:: ${error}`);
+      }
+    };
+
+
+const getRMQManagementAPI = async (queueName) => {
+  const url = `${process.env.RMQ_MANAGEMENT_API_URL}/queues/%2F/${queueName}`;
+  const response = await axios.get(url, {
+    auth: {
+      username: process.env.RMQ_USERNAME,
+      password: process.env.RMQ_PASSWORD,
+    }
+  });
+
+  console.log('response => ', response.data);
+  return response.data;
+}
+
+const main = async () => {
+  // await getRMQManagementAPI();
+  // await getMessageFromRabbitMQ();
+  await getMessageFromRabbitMQWithExchange();
+}
+
+// main();
